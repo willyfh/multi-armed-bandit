@@ -1,6 +1,7 @@
 """
 __author__  = Willy Fitra Hendria
 """
+import matplotlib.pyplot as plt
 import numpy as np
 import random
 
@@ -9,6 +10,10 @@ alpha = 0.01 # constant learning rate
 n_random_steps = 10 # number of steps for random action
 n_greedy_steps = 4000 # number of steps for greedy action
 optimistic_initial_value = 5 # optimistic initial value for greedy action
+percentages = [[] for i in range(n_armed)] # percentage for every 100 steps (each arm)
+avg_rewards = [] # avg rewards
+x_axis  = [] # number of steps (x axis)
+
 
 class SixArmedBandit:
 
@@ -16,13 +21,14 @@ class SixArmedBandit:
 		""" Uniformly Random Action Selection.
 		After 10 actions chosen randomly, it will return the average reward.
 		"""
-		rewards = []
+		global avg_rewards;
+		avg_rewards = [0]
 		for i in range(n_random_steps):
 			a = np.random.randint(n_armed)
 			r = self.__pull_bandit(a)
-			rewards.append(r)
+			avg_rewards.append(avg_rewards[i] + ((r - avg_rewards[i])/(i+1)))
 		print("Average reward for",n_random_steps,"uniformly chosen actions:")
-		print(sum(rewards)/len(rewards))
+		print(avg_rewards[len(avg_rewards)-1])
 		
 	def epsilon_greedy_action(self, is_stationary = True, epsilon = 0.1, is_optimistic_init = False):
 		""" Epsilon Greedy Action Selection.
@@ -31,15 +37,14 @@ class SixArmedBandit:
 		
 		q = [(optimistic_initial_value if is_optimistic_init else 0) for i in range(n_armed)] # estimation value
 		k = [0 for i in range(n_armed)] # counter of chosen actions
-		rewards = []
+		rewards = [0 for i in range(n_armed)]
 		for  i in range(n_greedy_steps):
 			a = self.__choose_epsilon_greedy_action(q, epsilon)
 			r = self.__pull_bandit(a, is_stationary, i+1)
 			k, q = self.__update_estimation(a, k, q, r, is_stationary)
-			rewards.append(r)
+			rewards[a] += r
 			self.__showActionResult(i, q, k, rewards)
-		
-		
+			
 	def __choose_epsilon_greedy_action(self, q, epsilon):
 		""" Random action with probability epsilon.
 		Greedy with probability 1 - epsilon.
@@ -83,11 +88,32 @@ class SixArmedBandit:
 		if ((n_steps+1) % 100 == 0):
 			print()
 			print("Result after",(n_steps+1),"actions:")
+			global percentages, x_axis, avg_rewards
+			x_axis.append(n_steps+1);
 			for i in range(len(k)):
-				print("arm-",i+1,":", (k[i]/sum(k))*100,"%")
-			print("Average reward :",sum(rewards)/len(rewards))
+				percentage = k[i]/sum(k)*100
+				percentages[i].append(percentage)
+				# avg_rewards[i].append(0 if k[i] == 0 else rewards[i]/k[i])
+				print("arm-",i+1,":", percentage,"%")
+			avg_reward = sum(rewards)/(n_steps+1)
+			avg_rewards.append(avg_reward)
+			print("Average reward :",avg_reward)
+
+	def drawGreedyPlot(self):
+		plt.subplot(2, 1, 1)
+		for i in range(n_armed):
+			plt.plot(x_axis ,percentages[i], 'o', label='arm-'+str(i+1))
+		plt.xlabel('steps')
+		plt.ylabel('percentage')
+		plt.legend(loc='center right')
 		
-		
+		plt.subplot(2, 1, 2)
+		plt.plot(x_axis ,avg_rewards, 'o')
+		plt.xlabel('steps')
+		plt.ylabel('average rewards')
+		plt.legend(loc='center right')
+		plt.show()
+
 six_armed_bandit = SixArmedBandit()
 
 print("Created by:")
@@ -104,13 +130,20 @@ print()
 print("------------------------------------------")
 if i == '1':
 	six_armed_bandit.uniform_action()
+	plt.plot(avg_rewards)
+	plt.xlabel('steps')
+	plt.ylabel('average rewards')
+	plt.show()
 elif i=='2':
 	six_armed_bandit.epsilon_greedy_action()
+	six_armed_bandit.drawGreedyPlot();
 elif i=='3':
 	#non-stationary
 	six_armed_bandit.epsilon_greedy_action(False)
+	six_armed_bandit.drawGreedyPlot();
 elif i=='4':
 	# non-stationary, epsilon=0 (greedy action), optimistic
 	six_armed_bandit.epsilon_greedy_action(False, 0, True)
+	six_armed_bandit.drawGreedyPlot();
 else:
 	print("Input not valid");
